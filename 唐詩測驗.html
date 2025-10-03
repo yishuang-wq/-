@@ -1,0 +1,424 @@
+<!-- Chosen Palette: Warm Neutrals (Background: FAF9F6, Accent: 6B46C1, Secondary: 4A5568) -->
+<!-- Application Structure Plan: The application uses a single-page structure divided into three main views managed by JavaScript state: Welcome/Start, Quiz Questions, and Results/Review. This flow (Start -> Answer Qs -> See Results) is logical for a quiz user journey. Tailwind CSS ensures the layout is fully responsive, prioritizing single-column layout and large touch targets for mobile usability. -->
+<!-- Visualization & Content Choices: Content (Quiz Questions, Options, Rationales) is stored in a JavaScript object. Presentation is purely textual and uses HTML/CSS for interactive components (buttons, progress bar, radio inputs). This minimalist approach focuses user attention on the text and logic, simplifying the interaction model, which is ideal for educational assessment and mobile use. NO SVG, NO Mermaid. -->
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>唐宋詩歌重點測驗 - 行動版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 確保主內容區域在任何設備上都能居中且最大化可讀性 */
+        .quiz-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1rem;
+            min-height: 100vh;
+        }
+        /* 自定義顏色 */
+        .bg-primary { background-color: #6B46C1; }
+        .text-primary { color: #6B46C1; }
+        .border-primary { border-color: #6B46C1; }
+        .bg-correct { background-color: #38A169; }
+        .bg-incorrect { background-color: #E53E3E; }
+
+        /* 為選項提供更大的觸控目標，增強手機體驗 */
+        .option-label {
+            display: block;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 0.5rem;
+            border: 2px solid #E2E8F0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .option-label:hover {
+            background-color: #F7FAFC;
+        }
+        input[type="radio"]:checked + .option-label {
+            border-color: #6B46C1;
+            background-color: #F3E8FF;
+        }
+        input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        /* 確保連結在深色背景上可見且可點擊 */
+        .link-text {
+            color: #6B46C1;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .link-text:hover {
+            color: #4A5568;
+        }
+    </style>
+</head>
+<body class="bg-[#FAF9F6] text-gray-800 font-sans">
+
+    <div id="app" class="quiz-container shadow-xl bg-white">
+        <!-- 應用程式內容將由 JavaScript 動態插入 -->
+    </div>
+
+    <script>
+        // 全域變數用於存儲 Firebase 相關資訊，以確保程式碼獨立運行
+        const __app_id = 'poetry-quiz-app';
+        const __firebase_config = '{}'; // 此處不使用 Firebase，但保持變數存在以符合環境要求
+        const __initial_auth_token = undefined; // 保持為 undefined
+
+        // 測驗數據：共 28 題 (已刪除 Q24, Q26)
+        const quizData = {
+            "title": "唐宋詩歌重點測驗 (共 28 題)",
+            "externalLink": "https://www.example.com/more-poetry-info", // 設定外部連結網址
+            "questions": [
+                { "id": 1, "question": "文件引述初唐上官儀的詩作「景致軟艷，格局較狹隘」，這代表初唐詩歌多數風格的何種特點？", "hint": "回想陳子昂為什麼要「極力主張詩歌風格改革」？他要改變的是什麼？", "options": [ { "text": "氣象渾厚，風骨健舉", "rationale": "氣象渾厚是盛唐詩歌的主要美學特點，與初唐風格不同。", "isCorrect": false }, { "text": "豪邁悲壯，華麗慘烈", "rationale": "這是初盛唐時期戍邊詩歌的基調，而非初唐多數作品的風格。", "isCorrect": false }, { "text": "多數風格浮艷，有形式但少真情", "rationale": "文件明確指出初唐多數風格浮艷，側重形式雕琢，缺乏真摯的情感。", "isCorrect": true }, { "text": "語言剛健質樸，主張革新", "rationale": "剛健質樸是初唐陳子昂等改革派的特點，但非多數詩作的樣貌。", "isCorrect": false } ] },
+                { "id": 2, "question": "盛唐詩歌被譽為中國詩歌史的黃金時代，其「盛唐氣象」在美學上呈現出何種特色？", "hint": "盛唐詩歌的美學印象被統稱為「盛唐之音」，它與國家的強盛息息相關。", "options": [ { "text": "以議論作詩，追求拗體格律", "rationale": "議論與拗體格律是宋詩（黃庭堅）的特點。", "isCorrect": false }, { "text": "風格浮艷，只重形式的工整對仗", "rationale": "風格浮艷是初唐多數詩歌的特點。", "isCorrect": false }, { "text": "風骨健舉、氣象渾厚、風神超越", "rationale": "這正是文件對盛唐詩歌美學樣態的概括，強調其雄渾壯大的氣勢。", "isCorrect": true }, { "text": "幽微細膩，沉迷綺艷，孤寂悲鬱", "rationale": "幽微細膩是晚唐詩歌的特點。", "isCorrect": false } ] },
+                { "id": 3, "question": "李白〈將進酒〉中「五花馬，千金裘，呼兒將出換美酒」一句，最能表現李白的何種情感或特點？", "hint": "回想李白被稱作「狂放不羈，瀟灑自我」，他將世俗的拘限拋到「十萬八千里之外」。", "options": [ { "text": "對現實社會的悲痛與入世情懷", "rationale": "這更符合杜甫的風格，李白此處是縱情享樂和灑脫。", "isCorrect": false }, { "text": "對酒當歌，懷才不遇又渴望用世的矛盾情感", "rationale": "以珍貴之物換酒，突顯其將世俗財物拋諸腦後的狂放，反映了在政治前途波折後縱情享樂，與渴望用世的矛盾。", "isCorrect": true }, { "text": "對人生哲理的思辨與領悟", "rationale": "思辨與哲理是宋詩的特點，此句重在情感宣洩。", "isCorrect": false }, { "text": "對戰亂中人民苦難的深切同情", "rationale": "這是杜甫等社會派詩人的核心主題。", "isCorrect": false } ] },
+                { "id": 4, "question": "中唐時期，杜甫成為詩歌史上不可或缺的一頁歷史，主要與哪一場歷史事件使國家由盛轉衰有關？", "hint": "這場戰亂標誌著唐朝國力走向下坡，也使杜甫從浪漫轉向現實。", "options": [ { "text": "安史之亂", "rationale": "杜甫正是在唐朝經歷安史之亂、由盛轉衰的時期，透過其詩歌記錄了社會的苦難。", "isCorrect": true }, { "text": "玄武門之變", "rationale": "玄武門之變發生在唐朝初年，是李世民登基的事件，與中唐詩歌轉折無關。", "isCorrect": false }, { "text": "黃巢之亂", "rationale": "黃巢之亂發生在晚唐，雖然也是重要戰亂，但杜甫詩歌的轉折主要是因安史之亂。", "isCorrect": false }, { "text": "貞觀之治", "rationale": "貞觀之治是唐朝初年的盛世，與杜甫所處的中唐衰亂時期相反。", "isCorrect": false } ] },
+                { "id": 5, "question": "在杜甫〈旅夜書懷〉中，「星垂平野闊，月湧大江流」兩句最為人稱道，其主要藝術作用為何？", "hint": "杜甫描寫這般浩瀚的宇宙，目的是想強調景物本身的美，還是為了烘托自身的情緒？", "options": [ { "text": "以近景描寫凸顯詩人像細草般渺小的形象", "rationale": "近景是「細草微風岸，危檣獨夜舟」，「星垂月湧」是雄闊的遠景。", "isCorrect": false }, { "text": "以闊大雄渾的景色，反襯作者孤苦伶仃、哀告無地的淒涼心情", "rationale": "詩人藉由描寫廣闊的天地來凸顯自身的渺小與孤單，即「以大襯小」的手法。", "isCorrect": true }, { "text": "描寫動態景觀，表達對政治抱負無法舒展的憤慨", "rationale": "雖然詩人有政治抱負難展的感慨，但景物描寫主要是襯托孤淒心情，而非直接表達憤慨。", "isCorrect": false }, { "text": "強調時光流逝、世事變遷的哲理", "rationale": "這更接近王勃〈滕王閣序〉末詩的感慨，而非此處杜甫描寫的重點。", "isCorrect": false } ] },
+                { "id": 6, "question": "李商隱〈夜雨寄北〉以問答成詩，並被認為具有「時空橫跨過去、現在、未來」的特點。下列哪一句話是指向「未來」的想望？", "hint": "請注意「何當」這個關鍵詞，它表達了對時間的不確定性和期盼。", "options": [ { "text": "君問歸期未有期", "rationale": "這是對「過去」準備離別時的追述，以及對「現在」歸期未定的回答。", "isCorrect": false }, { "text": "巴山夜雨漲秋池", "rationale": "這是詩人「現在」眼前實際所見的景象。", "isCorrect": false }, { "text": "何當共剪西窗燭", "rationale": "「何當」（何時）與「共剪西窗燭」描寫的是詩人對「未來」與妻子團聚時的虛擬想像。", "isCorrect": true }, { "text": "卻話巴山夜雨時", "rationale": "這是對未來團聚時，回憶「現在」情景的「虛中有實」的設計。", "isCorrect": false } ] },
+                { "id": 7, "question": "唐詩到宋詩的轉變中，宋代詩人開始大量用典，並講究「點鐵成金」和「奪胎換骨」等詩法，這代表了宋詩的何種特點？", "hint": "當技術或藝術形式發展到極致後，詩人會轉向追求什麼？", "options": [ { "text": "唐詩的發展已經差不多到瓶頸，藝術創作開始講究形式的追求", "rationale": "文件指出，當藝術創作開始講究形式的追求時，表示技術已大為成熟，詩的發展已近瓶頸，詞也準備興起。", "isCorrect": true }, { "text": "詩歌內容必須完全脫離生活，專注於學術理論的辯證", "rationale": "宋詩只是增加議論性，仍能更廣泛地表達生活內容。", "isCorrect": false }, { "text": "詩人必須拋棄所有舊有的詩歌格律，創造全新的詩體", "rationale": "宋詩只是在格律上不拘泥，並非完全拋棄，且其詩法仍基於對前人詩句的模擬與化用。", "isCorrect": false }, { "text": "士人普遍排斥文學，詩歌不再是知識分子論世抒懷的手段", "rationale": "宋代重文輕武，詩歌反而成為知識分子論世抒懷的重要手段。", "isCorrect": false } ] },
+                { "id": 8, "question": "黃庭堅〈寄黃幾復〉中的「持家但有四立壁」是化用典故讚美友人安貧樂道，而這裏「不改他人語意而另造他語」的技巧，被江西詩派稱為什麼？", "hint": "這個詩法強調的是用自己的方式重述別人的意思。", "options": [ { "text": "點鐵成金", "rationale": "點鐵成金是指將常見的詞語重新搭配，生出絕妙意境（如「十年燈」）。", "isCorrect": false }, { "text": "奪胎法", "rationale": "奪胎法是借用前人詩文或典故，但「捨其事，只用典面意」（如「北海君南海」）。", "isCorrect": false }, { "text": "換骨法", "rationale": "換骨法是指襲用前人的語意，但以自己的話語重新表達出來，即「不改他人語意而另造他語」。", "isCorrect": true }, { "text": "拗體格律", "rationale": "拗體格律是音律上的轉折變化，與用典技巧無關。", "isCorrect": false } ] },
+                { "id": 9, "question": "下列關於唐詩與宋詩美學特徵的比較，何者敘述錯誤？", "hint": "回想一下「陰柔細膩」的風格屬於唐詩的哪一個階段？它並不適用於整個唐代。", "options": [ { "text": "唐詩：像一幅畫，美在情與景；宋詩：像一篇散文詩，勝在理與思。", "rationale": "這是文件對兩者最核心的美學概括，強調唐詩重意境，宋詩重理性。", "isCorrect": false }, { "text": "唐詩注重「詩的藝術」，語言簡練精煉；宋詩重視「詩以載道」，語言上較不拘格律。", "rationale": "唐詩是黃金時代的藝術巔峰，宋詩則因理學影響而趨向載道。", "isCorrect": false }, { "text": "唐詩美學多為陰柔細膩、沉迷綺艷；宋詩美學多為雄渾大氣、氣象磅礴。", "rationale": "「陰柔細膩」是晚唐風格，而非唐詩總體。雄渾大氣是盛唐風格，而非宋詩總體。", "isCorrect": true }, { "text": "唐詩因社會開放，詩人多享自由；宋詩因重文輕武，詩歌成為知識分子論世抒懷的手段。", "rationale": "社會背景影響了詩歌的功能和風格，此敘述是正確的時代背景分析。", "isCorrect": false } ] },
+                { "id": 10, "question": "宋代蘇軾〈和子由澠池懷舊〉詩中以「人生到處知何似，應似飛鴻踏雪泥」比喻人生的際遇，這表現了宋詩的哪種特點？", "hint": "蘇軾此詩的結論是「不必太過計較往事，不如隨遇而安」，這是一種偏向哪一類的思想表達？", "options": [ { "text": "注重意境美與詞句對仗，強調詩的藝術", "rationale": "這是唐詩的特點，宋詩則不那麼注重意境的純粹性。", "isCorrect": false }, { "text": "以才學為詩，運用拗體格律", "rationale": "這是黃庭堅的江西詩派特點，蘇軾在此處展現的是哲理思辨。", "isCorrect": false }, { "text": "以邏輯思維代替形象思維，表現人生哲理的議論化傾向", "rationale": "將人生的無常以「飛鴻踏雪泥」的形象展開討論，是以形象為基礎的議論，體現了宋詩的理性思辨。", "isCorrect": true }, { "text": "繼承漢、魏、六朝的樂府，體多渾圓", "rationale": "這是對初唐與盛唐詩歌的描述。", "isCorrect": false } ] },
+                { "id": 11, "question": "根據文件內容，被譽為唐詩革新先驅者，主張詩歌內容充實、感情豐富、語言剛健質樸的是哪位詩人？", "hint": "這位詩人以「念天地之悠悠，獨愴然而涕下」的孤獨形象聞名。", "options": [ { "text": "王勃", "rationale": "王勃在初唐已開闊詩歌格局，但陳子昂更被視為是主張全面風格改革的先驅者。", "isCorrect": false }, { "text": "李白", "rationale": "李白是盛唐代表人物，風格狂放瀟灑，而非初唐的革新先驅。", "isCorrect": false }, { "text": "陳子昂", "rationale": "陳子昂繼承革新精神，極力主張詩歌風格改革，將唐詩從六朝浮豔轉向清新剛健。", "isCorrect": true }, { "text": "杜甫", "rationale": "杜甫是中唐現實主義詩人的代表，其貢獻主要在於詩歌的社會性與寫實。", "isCorrect": false } ] },
+                { "id": 12, "question": "盛唐詩歌的美學樣態被評論家嚴羽概括為「惟在興趣」，其具體特徵不包含下列哪一項？", "hint": "請回想唐詩從盛唐到晚唐的風格轉變，哪一個特徵更接近「夕陽無限好，只是近黃昏」的氛圍？", "options": [ { "text": "風骨健舉，氣象渾厚", "rationale": "風骨健舉和氣象渾厚是盛唐氣象的主要特徵之一。", "isCorrect": false }, { "text": "風神超越，興象玲瓏", "rationale": "風神超越和興象玲瓏也是文件所指出的盛唐美學樣態。", "isCorrect": false }, { "text": "體多渾圓，語多活潑", "rationale": "這是《滄浪詩話》對盛唐詩歌體多渾圓、語多活潑的具體描述。", "isCorrect": false }, { "text": "沉迷綺艷，感傷低迴", "rationale": "沉迷綺艷和感傷低迴是晚唐詩歌的基調，與盛唐雄渾壯大的氣勢相反。", "isCorrect": true } ] },
+                { "id": 13, "question": "文件引用蔣勳對李白與杜甫的評論，其中對杜甫詩歌特點的描述是下列何者？", "hint": "杜甫的詩歌常被稱作「詩史」，暗示他關注的焦點。", "options": [ { "text": "把自己的生命做為觀察主軸，以浪漫來對抗環境", "rationale": "這是蔣勳對李白詩歌風格的描述，強調其以浪漫對抗環境。", "isCorrect": false }, { "text": "在超越之中感受到前所未有的孤獨和寂寞", "rationale": "這是對李白詩歌中空靈、灑脫但同時孤獨的感受描述。", "isCorrect": false }, { "text": "社會性很強，從群體裡尋找生命的意義", "rationale": "杜甫經歷安史之亂，其詩歌充滿社會性，關注民生疾苦，有「詩史」之稱。", "isCorrect": true }, { "text": "以議論作詩，專以補綴奇字，重視才學", "rationale": "這是宋詩的特點，尤其與黃庭堅的風格相關，而非杜甫。", "isCorrect": false } ] },
+                { "id": 14, "question": "杜甫〈石壕吏〉全詩的敘事手法十分特殊，主要藉由何種方式來呈現事件？", "hint": "詩人整夜在石壕村投宿，他的感知器官主要在接收哪種信息來構成這個故事？", "options": [ { "text": "以第三人稱全知視角直接描述官吏的凶狠蠻橫", "rationale": "詩人採用純以聽覺來記人寫事的手法，並未直接刻劃官吏當時的反應，而是透過老婦的傾訴間接呈現。", "isCorrect": false }, { "text": "採用純以聽覺來記人寫事的手法，不著抒情和議論", "rationale": "文件指出詩人凝神屏息傾聽，透過老婦的「致詞」來推進情節，使主題更加突出且筆墨經濟。", "isCorrect": true }, { "text": "以強烈的視覺摹寫，描寫黑夜中老翁逾牆、老婦出門的場景", "rationale": "雖然有視覺描寫，但詩歌的核心敘事結構是透過聽覺上的「呼」、「啼」、「詞」來完成的。", "isCorrect": false }, { "text": "大量使用典故，借鑑樂府歌辭中的創作方法", "rationaire": "杜甫詩歌雖然寫實，但〈石壕吏〉這首詩主要以白描與對話（聽覺）為主，而非大量用典。", "isCorrect": false } ] },
+                { "id": 15, "question": "李商隱〈無題〉中的名句「春蠶到死絲方盡，蠟炬成灰淚始乾」，使用了何種修辭技巧來表達相思之情？", "hint": "此句運用了同音或近音字，將具體事物與抽象情感連結在一起。", "options": [ { "text": "借代", "rationale": "借代是以事物的部分、特徵等代替整體，與此句的表達方式不符。", "isCorrect": false }, { "text": "誇飾", "rationale": "此句雖然情感濃烈，但其主要藝術手法並非是單純的誇張描寫。", "isCorrect": false }, { "text": "倒裝", "rationale": "此句語序正常，並無詞語位置的特意更動。", "isCorrect": false }, { "text": "雙關", "rationale": "此句中的「絲」雙關「思」，「蠟淚」雙關「眼淚」，以物象之盡喻相思之苦永存。", "isCorrect": true } ] },
+                { "id": 16, "question": "晚唐詩歌的美學基調是「夕陽無限好，只是近黃昏」。這種詩風在藝術上常呈現出何種特點？", "hint": "李商隱的詩作常被視為「一個大時代繁華落盡的悲歌」。", "options": [ { "text": "豪邁開闊，超越世俗", "rationale": "這是盛唐李白等詩人的風格，與晚唐的衰世之象不符。", "isCorrect": false }, { "text": "充滿戰地經驗，氣勢豪壯悲壯", "rationale": "這是初盛唐時期「戍邊」詩歌的特點，並非晚唐主流。", "isCorrect": false }, { "text": "幽微細膩，沉迷綺艷，帶著輓歌式的淒美和落寞", "rationale": "晚唐詩歌對繁華的回憶和幻滅感，使其詩風轉為陰柔細膩、淒涼。", "isCorrect": true }, { "text": "語言剛健質樸，極力主張詩歌風格改革", "rationale": "這是初唐陳子昂的風格，旨在扭轉六朝的浮豔。", "isCorrect": false } ] },
+                { "id": 17, "question": "根據文件所述，宋詩與唐詩最主要的分別，在於宋詩強調何種美學特徵？", "hint": "唐詩像一幅畫，宋詩則被比喻為具有何種特質的文章？", "options": [ { "text": "詩中有畫，注重意境美", "rationale": "「詩中有畫」是對唐詩風格的高度概括。", "isCorrect": false }, { "text": "詩中有思，講求思想與理性", "rationale": "宋詩受理學與古文運動影響，重視「詩以載道」，傾向於理性的思辨。", "isCorrect": true }, { "text": "純以聽覺來記人寫事，客觀性強", "rationale": "這是中唐杜甫〈石壕吏〉的創作手法，並非宋詩的普遍美學特徵。", "isCorrect": false }, { "text": "體多渾圓，語多活潑，充滿興趣", "rationale": "這是盛唐詩歌的美學特點。", "isCorrect": false } ] },
+                { "id": 18, "question": "宋詩的表現手法中，黃庭堅「桃李春風一杯酒，江湖夜雨十年燈」此兩句完全以名詞組成，被江西詩派稱為哪種詩法？", "hint": "此詩法是將多個意象的名詞並列排列，組合出新的意境。", "options": [ { "text": "拗體格律", "rationale": "拗體是指平仄不依常格，使音調有突兀之感，強調的是音律變化而非詞彙組合。", "isCorrect": false }, { "text": "奪胎換骨", "rationale": "奪胎換骨是指化用前人舊事或語意，此句是名詞的重新組合，屬「點鐵成金」的展現。", "isCorrect": false }, { "text": "列錦格", "rationale": "列錦格是指將意象詞語並列組合，構成一幅畫面，此兩句正屬於此類。", "isCorrect": true }, { "text": "隔句對仗", "rationale": "隔句對仗是指兩聯之間，上句與下聯的下句對仗，此兩句是對聯本身的美學特點。", "isCorrect": false } ] },
+                { "id": 19, "question": "杜甫在〈旅夜書懷〉中，以「飄飄何所似？天地一沙鷗」自喻，這表達了作者何種心境？", "hint": "請留意此詩寫於杜甫晚年離開成都之後，處於「暮年飄泊」之際。", "options": [ { "text": "積極進取，渴望「更上一層樓」的壯志", "rationale": "積極進取的精神更貼近盛唐詩人如王之渙的風格，與杜甫晚年飄泊的心境不符。", "isCorrect": false }, { "text": "縱情享樂，對世俗一切拘限拋到腦後", "rationale": "縱情享樂是李白等浪漫主義詩人的風格，與杜甫的入世情懷不同。", "isCorrect": false }, { "text": "老來無成，江湖飄蕩轉徙，內心無依無助的淒涼景況", "rationale": "這兩句正是詩人對自己晚年失意、居無定所的總結，充滿了孤寂悲鬱的基調。", "isCorrect": true }, { "text": "對友人相隔遙遠，只能以雁足傳書的無奈", "rationale": "這是在描述友人間的離別之情，與杜甫此詩的個人情懷無關。", "isCorrect": false } ] },
+                { "id": 20, "question": "關於宋詩的寫作特點與流派，下列敘述何者正確？", "hint": "回想宋代「重文輕武」的時代背景，士人多受何種思潮影響？", "options": [ { "text": "宋詩受到六朝樂府詩的影響，多數風格趨向浮艷與華麗", "rationale": "浮艷與華麗是六朝詩的特點，宋詩則趨向平實和議論。", "isCorrect": false }, { "text": "宋詩受古文運動影響，常採「以文為詩」的作法，故詩歌傾向散文化", "rationale": "宋代散文重文從字順，影響到詩歌也傾向散文化，更自如地表達生活內容。", "isCorrect": true }, { "text": "宋詩不尚藻繪，且極力避免用典，以達到質樸無華的藝術效果", "rationale": "宋詩並不避免藻繪，反而流行江西詩派，強調大量用典和「無字無來歷」。", "isCorrect": false }, { "text": "宋代詩歌的議論化，是以形象思維代替邏輯思維的特點", "rationale": "宋詩是以邏輯思維代替形象思維，這是其議論化的一個重要特點。", "isCorrect": false } ] },
+                { "id": 21, "question": "下列關於唐朝「詩仙」李白和「詩聖」杜甫的創作主題比較，何者正確？", "hint": "一個是浪漫的，一個是現實的。", "options": [ { "text": "李白多寫國家戰亂與民生疾苦，杜甫多寫個人遭遇與浪漫情懷。", "rationale": "這是錯誤的，李白多浪漫，杜甫多寫社會現實。", "isCorrect": false }, { "text": "李白多寫山水、飲酒、自我抒發；杜甫多寫社會性、民生疾苦、政治抱負。", "rationale": "這準確概括了兩位詩人的核心創作主題。", "isCorrect": true }, { "text": "兩人都屬於中唐詩人，創作風格皆受到安史之亂的影響。", "rationale": "李白是盛唐詩人，安史之亂爆發時李白已近晚年。", "isCorrect": false }, { "text": "李白常使用拗體格律，杜甫則擅長七言律詩和樂府體。", "rationale": "李白多用古體詩，杜甫律詩成就最高，但拗體是宋詩特點。", "isCorrect": false } ] },
+                { "id": 22, "question": "在宋代，詩人學李白、杜甫，但風格仍不同於唐詩，這主要是受到哪一學說和哪一文學運動的影響？", "hint": "宋代官方推崇哪種學術思想？同時期哪位文人領導了散文復興？", "options": [ { "text": "佛教禪宗、格律詩運動", "rationale": "佛教對宋代影響較小，且宋詩不重格律。", "isCorrect": false }, { "text": "道家思想、駢文復興運動", "rationale": "宋代推崇理學，且發起了古文運動。", "isCorrect": false }, { "text": "理學、古文運動", "rationale": "理學強調義理，古文運動主張「文以載道」，兩者使宋詩趨向理性、議論化。", "isCorrect": true }, { "text": "玄學、新樂府運動", "rationale": "玄學是魏晉的學術思潮，新樂府運動是中唐的。", "isCorrect": false } ] },
+                { "id": 23, "question": "下列哪一句詩詞最能體現宋詞「婉約派」詞人追求的「語盡而意不盡」的含蓄之美？", "hint": "婉約派的風格是細膩、含蓄、幽微。", "options": [ { "text": "大江東去，浪淘盡，千古風流人物。", "rationale": "這是蘇軾的詞句，屬於豪放派，風格豪邁。", "isCorrect": false }, { "text": "念去去，千里煙波，暮靄沈沈楚天闊。", "rationale": "這是柳永的詞句，雖然屬婉約派，但情感直接，不如選項三含蓄。", "isCorrect": false }, { "text": "尋尋覓覓，冷冷清清，淒淒慘慘戚戚。", "rationale": "這是李清照的詞句，極度運用疊字，將幽微的悲傷表達得淋漓盡致，具有含蓄之美。", "isCorrect": true }, { "text": "醉裡挑燈看劍，夢回吹角連營。", "rationale": "這是辛棄疾的詞句，屬於豪放派，充滿軍旅氣概。", "isCorrect": false } ] },
+                { "id": 25, "question": "【預設問題】杜甫的詩被後世譽為什麼？", "hint": "他的作品紀錄了唐朝由盛轉衰的歷史。", "options": [ { "text": "詩仙", "rationale": "詩仙是李白。", "isCorrect": false }, { "text": "詩聖", "rationale": "杜甫被尊為詩聖。", "isCorrect": true }, { "text": "詩鬼", "rationale": "詩鬼是李賀。", "isCorrect": false }, { "text": "詩佛", "rationale": "詩佛是王維。", "isCorrect": false } ] },
+                { "id": 27, "question": "【預設問題】宋詞的發展比宋詩更為興盛，主要原因是什麼？", "hint": "這是因為宋詞在形式上具有什麼特點？", "options": [ { "text": "宋朝禁止寫詩", "rationale": "這是錯誤的，宋詩只是轉向議論化。", "isCorrect": false }, { "text": "宋詞比詩歌更適合配樂歌唱", "rationale": "詞的本質就是可歌的詩，更適合大眾傳播。", "isCorrect": true }, { "text": "宋詞的字數比詩歌多", "rationale": "字數不是主要原因。", "isCorrect": false }, { "text": "宋詞的格律比詩歌簡單", "rationale": "宋詞格律複雜且嚴格。", "isCorrect": false } ] },
+                { "id": 28, "question": "【預設問題】王維被譽為「詩中有畫」，這指的是他的詩歌有何特點？", "hint": "他的詩歌常將視覺意象融入文字中。", "options": [ { "text": "情感強烈，充滿議論", "rationale": "這是宋詩的特點。", "isCorrect": false }, { "text": "色彩豐富，畫面感強烈", "rationale": "王維的詩歌善於描繪自然山水，富有畫面感。", "isCorrect": true }, { "text": "詩句多用典故，晦澀難懂", "rationale": "這是晚唐李商隱或宋詩的特點。", "isCorrect": false }, { "text": "風格豪邁奔放，不拘小節", "rationale": "這是李白的風格。", "isCorrect": false } ] },
+                { "id": 29, "question": "【預設問題】下列哪位詩人是中唐「新樂府運動」的代表人物？", "hint": "他主張「文章合為時而著，歌詩合為事而作」。", "options": [ { "text": "白居易", "rationale": "白居易與元稹共同領導了新樂府運動。", "isCorrect": true }, { "text": "孟郊", "rationale": "孟郊是苦吟派詩人。", "isCorrect": false }, { "text": "劉禹錫", "rationale": "劉禹錫是中唐詩人，但不屬於新樂府運動的核心。", "isCorrect": false }, { "text": "韋應物", "rationale": "韋應物是山水田園派詩人。", "isCorrect": false } ] },
+                { "id": 30, "question": "【預設問題】江西詩派的詩歌創作風格，常被認為有何缺陷？", "hint": "過度強調技巧和用典可能導致什麼結果？", "options": [ { "text": "過於浪漫，脫離現實生活", "rationale": "這是浪漫主義的特點。", "isCorrect": false }, { "text": "專注於形式技巧，內容略顯貧乏或生硬", "rationale": "江西詩派因過度強調「奪胎換骨」、「點鐵成金」等技巧，容易導致內容生硬。", "isCorrect": true }, { "text": "語言過於質樸，缺乏文采", "rationale": "這與江西詩派的特點不符。", "isCorrect": false }, { "text": "缺乏議論性，無法表達哲理", "rationale": "宋詩本身就具有議論化傾向。", "isCorrect": false } ] }
+            ]
+        };
+
+        let state = {
+            currentView: 'welcome', // 'welcome', 'quiz', 'results'
+            currentQuestionIndex: 0,
+            answers: {}, // { questionId: selectedOptionIndex }
+            score: 0,
+            quizFinished: false,
+            message: '' // 用於顯示提示或錯誤訊息
+        };
+
+        const app = document.getElementById('app');
+        
+        // --- 輔助函數：本地儲存/讀取狀態（模擬自動儲存） ---
+        const LOCAL_STORAGE_KEY = 'poetryQuizState';
+
+        const saveState = () => {
+            try {
+                // 僅儲存重要狀態
+                const stateToSave = {
+                    currentView: state.currentView,
+                    currentQuestionIndex: state.currentQuestionIndex,
+                    answers: state.answers,
+                    score: state.score,
+                    quizFinished: state.quizFinished
+                };
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
+            } catch (error) {
+                console.error("無法儲存狀態:", error);
+            }
+        };
+
+        const loadState = () => {
+            try {
+                const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (savedState) {
+                    const loadedState = JSON.parse(savedState);
+                    // 確保載入的狀態是有效且完整的
+                    state = { ...state, ...loadedState };
+
+                    // 重新計算分數（以防萬一）
+                    state.score = calculateScore(state.answers);
+
+                    // 如果已經完成，直接顯示結果
+                    if (state.quizFinished) {
+                        state.currentView = 'results';
+                    }
+                }
+            } catch (error) {
+                console.error("無法載入狀態:", error);
+                localStorage.removeItem(LOCAL_STORAGE_KEY); // 清除損壞的儲存
+            }
+        };
+
+        const clearState = () => {
+            state = {
+                currentView: 'welcome',
+                currentQuestionIndex: 0,
+                answers: {},
+                score: 0,
+                quizFinished: false,
+                message: ''
+            };
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+        };
+
+
+        // --- 邏輯函數 ---
+        const calculateScore = (answers) => {
+            let correctCount = 0;
+            quizData.questions.forEach(q => {
+                const selectedIndex = answers[q.id];
+                if (selectedIndex !== undefined) {
+                    const isCorrect = q.options[selectedIndex].isCorrect;
+                    if (isCorrect) {
+                        correctCount++;
+                    }
+                }
+            });
+            return correctCount;
+        };
+        
+        const goToNextQuestion = () => {
+            if (state.currentQuestionIndex < quizData.questions.length - 1) {
+                state.currentQuestionIndex++;
+            } else {
+                finishQuiz();
+                return;
+            }
+            state.message = '';
+            saveState();
+            render();
+        };
+
+        const goToPrevQuestion = () => {
+            if (state.currentQuestionIndex > 0) {
+                state.currentQuestionIndex--;
+            }
+            state.message = '';
+            saveState();
+            render();
+        };
+
+        const handleOptionSelect = (questionId, optionIndex) => {
+            // 儲存答案
+            state.answers[questionId] = optionIndex;
+            
+            // 即時計算分數（可選，但對於單選測驗較方便）
+            state.score = calculateScore(state.answers);
+            
+            // 自動跳轉到下一題
+            goToNextQuestion();
+        };
+
+        const finishQuiz = () => {
+            state.score = calculateScore(state.answers);
+            state.quizFinished = true;
+            state.currentView = 'results';
+            saveState();
+            render();
+        };
+
+        const startQuiz = (reset = false) => {
+            if (reset) {
+                clearState();
+            }
+            state.currentView = 'quiz';
+            state.currentQuestionIndex = 0;
+            state.quizFinished = false;
+            saveState();
+            render();
+        };
+
+        // --- 渲染函數 ---
+        const renderWelcome = () => {
+            // 標題設為連結 (這是這次更新的重點)
+            const titleHtml = `
+                <a href="${quizData.externalLink}" target="_blank" class="link-text no-underline">
+                    <h1 class="text-3xl font-extrabold text-gray-800 hover:text-primary transition-colors cursor-pointer">
+                        ${quizData.title}
+                    </h1>
+                </a>
+            `;
+
+            app.innerHTML = `
+                <div class="p-6 sm:p-10 bg-white rounded-xl shadow-lg">
+                    ${titleHtml}
+                    <p class="mt-4 text-lg text-gray-600">本測驗包含唐宋詩歌共 ${quizData.questions.length} 題，旨在檢視您對主要詩人風格、詩法與時代背景的理解。</p>
+                    <div class="mt-6 p-4 bg-purple-50 rounded-lg border-l-4 border-primary">
+                        <p class="font-semibold text-gray-700">準備事項：</p>
+                        <ul class="list-disc list-inside ml-4 text-sm text-gray-500 mt-1 space-y-1">
+                            <li>測驗將自動記錄您的進度。</li>
+                            <li>完成所有題目後，請點擊「提交」查看分數與解析。</li>
+                            <li>點擊上方標題可前往外部資料頁面（範例連結）。</li>
+                        </ul>
+                    </div>
+                    <button onclick="startQuiz(true)" class="mt-8 w-full sm:w-auto px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition duration-150 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300">
+                        開始測驗
+                    </button>
+                    ${state.currentQuestionIndex > 0 || state.quizFinished ? `
+                        <button onclick="startQuiz(false)" class="mt-4 w-full sm:w-auto sm:ml-4 px-8 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition duration-150">
+                            繼續上次進度 (Q${state.currentQuestionIndex + 1})
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        };
+
+        const renderQuiz = () => {
+            const totalQuestions = quizData.questions.length;
+            const q = quizData.questions[state.currentQuestionIndex];
+            const currentAnswerIndex = state.answers[q.id];
+            const progress = ((state.currentQuestionIndex + 1) / totalQuestions) * 100;
+
+            const optionsHtml = q.options.map((option, index) => `
+                <label>
+                    <input type="radio" 
+                           name="question-${q.id}" 
+                           value="${index}"
+                           ${currentAnswerIndex === index ? 'checked' : ''}
+                           onclick="handleOptionSelect(${q.id}, ${index})"
+                           />
+                    <div class="option-label text-base">
+                        <span class="font-medium text-gray-800">${String.fromCharCode(65 + index)}. </span>
+                        <span>${option.text}</span>
+                    </div>
+                </label>
+            `).join('');
+
+
+            const navButtonsHtml = `
+                <div class="flex justify-between mt-8">
+                    <button onclick="goToPrevQuestion()" 
+                            ${state.currentQuestionIndex === 0 ? 'disabled' : ''}
+                            class="px-4 py-2 text-gray-700 bg-gray-200 font-semibold rounded-lg hover:bg-gray-300 disabled:opacity-50 transition duration-150">
+                        上一題
+                    </button>
+                    <button onclick="goToNextQuestion()" 
+                            class="px-4 py-2 text-white bg-primary font-semibold rounded-lg hover:bg-purple-700 transition duration-150 transform focus:outline-none focus:ring-4 focus:ring-purple-300">
+                        ${state.currentQuestionIndex === totalQuestions - 1 ? '提交測驗' : '下一題'}
+                    </button>
+                </div>
+            `;
+
+            app.innerHTML = `
+                <div class="p-6 sm:p-8">
+                    <!-- 進度條 -->
+                    <div class="mb-6">
+                        <p class="text-sm font-medium text-gray-500">進度：${state.currentQuestionIndex + 1} / ${totalQuestions}</p>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1">
+                            <div class="bg-primary h-2.5 rounded-full" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 題目內容 -->
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        Q${q.id}. ${q.question}
+                    </h2>
+                    ${q.hint ? `<p class="text-sm text-purple-600 italic mb-4 p-3 bg-purple-50 rounded-lg border-l-4 border-purple-300">提示: ${q.hint}</p>` : ''}
+                    
+                    <!-- 選項 -->
+                    <form id="quiz-form" class="space-y-3">
+                        ${optionsHtml}
+                    </form>
+
+                    <!-- 導航按鈕 -->
+                    ${navButtonsHtml}
+                    
+                    ${state.message ? `<p class="mt-4 text-red-500 font-medium">${state.message}</p>` : ''}
+                </div>
+            `;
+        };
+
+        const renderResults = () => {
+            const totalQuestions = quizData.questions.length;
+            const correctCount = state.score;
+            const percentage = (correctCount / totalQuestions) * 100;
+            
+            // 標題設為連結 (這是這次更新的重點)
+            const titleHtml = `
+                <a href="${quizData.externalLink}" target="_blank" class="link-text no-underline">
+                    <h1 class="text-3xl font-extrabold text-gray-800 hover:text-primary transition-colors cursor-pointer">
+                        ${quizData.title}
+                    </h1>
+                </a>
+            `;
+
+            const reviewItemsHtml = quizData.questions.map(q => {
+                const selectedIndex = state.answers[q.id];
+                const selectedOption = q.options[selectedIndex];
+                const isCorrect = selectedOption ? selectedOption.isCorrect : false;
+                const resultClass = isCorrect ? 'bg-correct' : 'bg-incorrect';
+                const icon = isCorrect ? '✅' : '❌';
+                const rationaleText = q.options.find(opt => opt.isCorrect)?.rationale || '無正確答案解析';
+
+                return `
+                    <div class="p-4 rounded-lg border mb-4 shadow-sm ${isCorrect ? 'border-correct' : 'border-incorrect'}">
+                        <p class="text-lg font-bold mb-2">
+                            ${icon} Q${q.id}: ${q.question}
+                        </p>
+                        <p class="font-medium ${isCorrect ? 'text-correct' : 'text-incorrect'}">
+                            您的選擇: ${selectedOption ? selectedOption.text : '未作答'}
+                        </p>
+                        <p class="text-green-700 mt-1">
+                            正確答案: ${q.options.find(opt => opt.isCorrect)?.text || 'N/A'}
+                        </p>
+                        <div class="mt-2 p-3 bg-gray-50 rounded-md text-sm text-gray-700 border-l-4 border-primary">
+                            <strong class="text-primary">解析：</strong> ${rationaleText}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            app.innerHTML = `
+                <div class="p-6 sm:p-10 bg-white rounded-xl shadow-lg">
+                    ${titleHtml}
+                    <h2 class="text-3xl font-bold mt-4 mb-6">測驗結果</h2>
+                    
+                    <!-- 分數卡片 -->
+                    <div class="bg-primary text-white p-6 rounded-xl text-center mb-8 shadow-md">
+                        <p class="text-xl">您的分數</p>
+                        <p class="text-5xl font-extrabold my-2">${correctCount} / ${totalQuestions}</p>
+                        <p class="text-xl font-semibold">正確率：${percentage.toFixed(2)}%</p>
+                    </div>
+
+                    <h3 class="text-2xl font-bold mb-4 text-gray-800">答案回顧與解析</h3>
+                    ${reviewItemsHtml}
+
+                    <button onclick="startQuiz(true)" class="mt-8 w-full px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition duration-150 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300">
+                        重新測驗
+                    </button>
+                </div>
+            `;
+        };
+
+        const render = () => {
+            app.innerHTML = ''; // 清除現有內容
+            switch (state.currentView) {
+                case 'welcome':
+                    renderWelcome();
+                    break;
+                case 'quiz':
+                    renderQuiz();
+                    break;
+                case 'results':
+                    renderResults();
+                    break;
+                default:
+                    renderWelcome();
+            }
+        };
+        
+        // 頁面載入時執行
+        window.onload = () => {
+            loadState();
+            render();
+            console.log("Firebase Log Level: Debug"); // 保持 log level 設置
+        };
+    </script>
+</body>
+</html>
